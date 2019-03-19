@@ -5,9 +5,9 @@
 * [Overall Test Coverage](#overall-test-coverage)
 # Node Test Coverage
 ## Summary
-Node tests have covered 111/118 (94.07%, 5 generators excluded) common operators.
+Node tests have covered 113/120 (94.17%, 5 generators excluded) common operators.
 
-Node tests have covered 2/11 (18.18%, 0 generators excluded) experimental operators.
+Node tests have covered 0/4 (0.00%, 0 generators excluded) experimental operators.
 
 * [Covered Common Operators](#covered-common-operators)
 * [No Cover Common Operators](#no-cover-common-operators)
@@ -465,7 +465,7 @@ expect(node, inputs=[x], outputs=[y],
 
 
 ### AveragePool
-There are 12 test cases, listed as following:
+There are 13 test cases, listed as following:
 <details>
 <summary>averagepool_1d_default</summary>
 
@@ -489,6 +489,36 @@ padded = x
 y = pool(padded, x_shape, kernel_shape, strides, out_shape, [0], 'AVG')
 
 expect(node, inputs=[x], outputs=[y], name='test_averagepool_1d_default')
+```
+
+</details>
+<details>
+<summary>averagepool_2d_ceil</summary>
+
+```python
+"""
+input_shape: [1, 1, 4, 4]
+output_shape: [1, 1, 2, 2]
+"""
+node = onnx.helper.make_node(
+    'AveragePool',
+    inputs=['x'],
+    outputs=['y'],
+    kernel_shape=[3, 3],
+    strides=[2, 2],
+    ceil_mode=True
+)
+x = np.array([[[
+    [1, 2, 3, 4],
+    [5, 6, 7, 8],
+    [9, 10, 11, 12],
+    [13, 14, 15, 16],
+]]]).astype(np.float32)
+y = np.array([[[
+    [6, 7.5],
+    [12, 13.5]]]]).astype(np.float32)
+
+expect(node, inputs=[x], outputs=[y], name='export_averagepool_2d_ceil')
 ```
 
 </details>
@@ -3112,7 +3142,7 @@ expect(node, inputs=[data_0, data_1], outputs=[result],
 
 
 ### MaxPool
-There are 12 test cases, listed as following:
+There are 13 test cases, listed as following:
 <details>
 <summary>maxpool_1d_default</summary>
 
@@ -3136,6 +3166,36 @@ padded = x
 y = pool(padded, x_shape, kernel_shape, strides, out_shape, [0], 'MAX')
 
 expect(node, inputs=[x], outputs=[y], name='test_maxpool_1d_default')
+```
+
+</details>
+<details>
+<summary>maxpool_2d_ceil</summary>
+
+```python
+"""
+input_shape: [1, 1, 4, 4]
+output_shape: [1, 1, 2, 2]
+"""
+node = onnx.helper.make_node(
+    'MaxPool',
+    inputs=['x'],
+    outputs=['y'],
+    kernel_shape=[3, 3],
+    strides=[2, 2],
+    ceil_mode=True
+)
+x = np.array([[[
+    [1, 2, 3, 4],
+    [5, 6, 7, 8],
+    [9, 10, 11, 12],
+    [13, 14, 15, 16],
+]]]).astype(np.float32)
+y = np.array([[[
+    [11, 12],
+    [15, 16]]]]).astype(np.float32)
+
+expect(node, inputs=[x], outputs=[y], name='export_maxpool_2d_ceil')
 ```
 
 </details>
@@ -3573,6 +3633,43 @@ node = onnx.helper.make_node(
 )
 expect(node, inputs=[data_0, data_1], outputs=[result],
        name='test_mean_two_inputs')
+```
+
+</details>
+
+
+### MeanVarianceNormalization
+There are 1 test cases, listed as following:
+<details>
+<summary>meanvariancenormalization</summary>
+
+```python
+node = onnx.helper.make_node(
+    'MeanVarianceNormalization',
+    inputs=['X'],
+    outputs=['Y']
+)
+
+input_data = np.array([[[[0.8439683], [0.5665144], [0.05836735]],
+    [[0.02916367], [0.12964272], [0.5060197]],
+    [[0.79538304], [0.9411346], [0.9546573]]],
+    [[[0.17730942], [0.46192095], [0.26480448]],
+    [[0.6746842], [0.01665257], [0.62473077]],
+    [[0.9240844], [0.9722341], [0.11965699]]],
+    [[[0.41356155], [0.9129373], [0.59330076]],
+    [[0.81929934], [0.7862604], [0.11799799]],
+    [[0.69248444], [0.54119414], [0.07513223]]]], dtype=np.float32)
+
+# Calculate expected output data
+data_mean = np.mean(input_data, axis=(0, 1, 2, 3), keepdims=1)
+data_mean_squared = np.power(data_mean, 2)
+data_squared = np.power(input_data, 2)
+data_squared_mean = np.mean(data_squared, axis=(0, 1, 2, 3), keepdims=1)
+std = np.sqrt(data_squared_mean - data_mean_squared)
+expected_output = (input_data - data_mean) / (std + 1e-9)
+
+expect(node, inputs=[input_data], outputs=[expected_output],
+       name='test_mvn')
 ```
 
 </details>
@@ -5581,24 +5678,25 @@ expect(node, inputs=[x], outputs=[y],
 
 
 ### Slice
-There are 5 test cases, listed as following:
+There are 7 test cases, listed as following:
 <details>
 <summary>slice</summary>
 
 ```python
 node = onnx.helper.make_node(
     'Slice',
-    inputs=['x'],
+    inputs=['x', 'starts', 'ends', 'axes', 'steps'],
     outputs=['y'],
-    axes=[0, 1],
-    starts=[0, 0],
-    ends=[3, 10],
 )
 
 x = np.random.randn(20, 10, 5).astype(np.float32)
 y = x[0:3, 0:10]
+starts = np.array([0, 0], dtype=np.int64)
+ends = np.array([3, 10], dtype=np.int64)
+axes = np.array([0, 1], dtype=np.int64)
+steps = np.array([1, 1], dtype=np.int64)
 
-expect(node, inputs=[x], outputs=[y],
+expect(node, inputs=[x, starts, ends, axes, steps], outputs=[y],
        name='test_slice')
 ```
 
@@ -5609,17 +5707,38 @@ expect(node, inputs=[x], outputs=[y],
 ```python
 node = onnx.helper.make_node(
     'Slice',
-    inputs=['x'],
+    inputs=['x', 'starts', 'ends'],
     outputs=['y'],
-    starts=[0, 0, 3],
-    ends=[20, 10, 4],
 )
 
 x = np.random.randn(20, 10, 5).astype(np.float32)
+starts = np.array([0, 0, 3], dtype=np.int64)
+ends = np.array([20, 10, 4], dtype=np.int64)
 y = x[:, :, 3:4]
 
-expect(node, inputs=[x], outputs=[y],
+expect(node, inputs=[x, starts, ends], outputs=[y],
        name='test_slice_default_axes')
+```
+
+</details>
+<details>
+<summary>slice_default_steps</summary>
+
+```python
+node = onnx.helper.make_node(
+    'Slice',
+    inputs=['x', 'starts', 'ends', 'axes'],
+    outputs=['y'],
+)
+
+x = np.random.randn(20, 10, 5).astype(np.float32)
+starts = np.array([0, 0, 3], dtype=np.int64)
+ends = np.array([20, 10, 4], dtype=np.int64)
+axes = np.array([0, 1, 2], dtype=np.int64)
+y = x[:, :, 3:4]
+
+expect(node, inputs=[x, starts, ends, axes], outputs=[y],
+       name='test_slice_default_steps')
 ```
 
 </details>
@@ -5629,17 +5748,18 @@ expect(node, inputs=[x], outputs=[y],
 ```python
 node = onnx.helper.make_node(
     'Slice',
-    inputs=['x'],
+    inputs=['x', 'starts', 'ends', 'axes', 'steps'],
     outputs=['y'],
-    axes=[1],
-    starts=[1],
-    ends=[1000],
 )
 
 x = np.random.randn(20, 10, 5).astype(np.float32)
+starts = np.array([1], dtype=np.int64)
+ends = np.array([1000], dtype=np.int64)
+axes = np.array([1], dtype=np.int64)
+steps = np.array([1], dtype=np.int64)
 y = x[:, 1:1000]
 
-expect(node, inputs=[x], outputs=[y],
+expect(node, inputs=[x, starts, ends, axes, steps], outputs=[y],
        name='test_slice_end_out_of_bounds')
 ```
 
@@ -5650,18 +5770,41 @@ expect(node, inputs=[x], outputs=[y],
 ```python
 node = onnx.helper.make_node(
     'Slice',
-    inputs=['x'],
+    inputs=['x', 'starts', 'ends', 'axes', 'steps'],
     outputs=['y'],
-    axes=[1],
-    starts=[0],
-    ends=[-1],
 )
 
 x = np.random.randn(20, 10, 5).astype(np.float32)
+starts = np.array([0], dtype=np.int64)
+ends = np.array([-1], dtype=np.int64)
+axes = np.array([1], dtype=np.int64)
+steps = np.array([1], dtype=np.int64)
 y = x[:, 0:-1]
 
-expect(node, inputs=[x], outputs=[y],
+expect(node, inputs=[x, starts, ends, axes, steps], outputs=[y],
        name='test_slice_neg')
+```
+
+</details>
+<details>
+<summary>slice_neg_steps</summary>
+
+```python
+node = onnx.helper.make_node(
+    'Slice',
+    inputs=['x', 'starts', 'ends', 'axes', 'steps'],
+    outputs=['y'],
+)
+
+x = np.random.randn(20, 10, 5).astype(np.float32)
+starts = np.array([20, 10, 4], dtype=np.int64)
+ends = np.array([0, 0, 1], dtype=np.int64)
+axes = np.array([0, 1, 2], dtype=np.int64)
+steps = np.array([-1, -3, -2])
+y = x[20:0:-1, 10:0:-3, 4:1:-2]
+
+expect(node, inputs=[x, starts, ends, axes, steps], outputs=[y],
+       name='test_slice_neg_steps')
 ```
 
 </details>
@@ -5671,17 +5814,18 @@ expect(node, inputs=[x], outputs=[y],
 ```python
 node = onnx.helper.make_node(
     'Slice',
-    inputs=['x'],
+    inputs=['x', 'starts', 'ends', 'axes', 'steps'],
     outputs=['y'],
-    axes=[1],
-    starts=[1000],
-    ends=[1000],
 )
 
 x = np.random.randn(20, 10, 5).astype(np.float32)
+starts = np.array([1000], dtype=np.int64)
+ends = np.array([1000], dtype=np.int64)
+axes = np.array([1], dtype=np.int64)
+steps = np.array([1], dtype=np.int64)
 y = x[:, 1000:1000]
 
-expect(node, inputs=[x], outputs=[y],
+expect(node, inputs=[x, starts, ends, axes, steps], outputs=[y],
        name='test_slice_start_out_of_bounds')
 ```
 
@@ -6415,6 +6559,57 @@ expect(node, inputs=[input], outputs=[output], name='test_tfidfvectorizer_tf_uni
 </details>
 
 
+### ThresholdedRelu
+There are 2 test cases, listed as following:
+<details>
+<summary>default</summary>
+
+```python
+default_alpha = 1.0
+node = onnx.helper.make_node(
+    'ThresholdedRelu',
+    inputs=['x'],
+    outputs=['y']
+)
+x = np.random.randn(3, 4, 5).astype(np.float32)
+y = np.clip(x, default_alpha, np.inf)
+y[y == default_alpha] = 0
+
+expect(node, inputs=[x], outputs=[y],
+       name='test_thresholdedrelu_default')
+```
+
+</details>
+<details>
+<summary>thresholdedrelu</summary>
+
+```python
+alpha = 2.0
+node = onnx.helper.make_node(
+    'ThresholdedRelu',
+    inputs=['x'],
+    outputs=['y'],
+    alpha=alpha
+)
+
+x = np.array([-1.5, 0., 1.2, 2.0, 2.2]).astype(np.float32)
+y = np.clip(x, alpha, np.inf)  # expected output [0., 0., 0., 0., 2.2]
+y[y == alpha] = 0
+
+expect(node, inputs=[x], outputs=[y],
+       name='test_thresholdedrelu_example')
+
+x = np.random.randn(3, 4, 5).astype(np.float32)
+y = np.clip(x, alpha, np.inf)
+y[y == alpha] = 0
+
+expect(node, inputs=[x], outputs=[y],
+       name='test_thresholdedrelu')
+```
+
+</details>
+
+
 ### Tile
 There are 2 test cases, listed as following:
 <details>
@@ -6481,15 +6676,15 @@ There are 1 test cases, listed as following:
 ```python
 node = onnx.helper.make_node(
     'TopK',
-    inputs=['x'],
+    inputs=['x', 'k'],
     outputs=['values', 'indices'],
-    k=3
 )
 X = np.array([
     [0, 1, 2, 3],
     [4, 5, 6, 7],
     [8, 9, 10, 11],
 ], dtype=np.float32)
+K = np.array([3], dtype=np.int64)
 values_ref = np.array([
     [3, 2, 1],
     [7, 6, 5],
@@ -6501,7 +6696,7 @@ indices_ref = np.array([
     [3, 2, 1],
 ], dtype=np.int64)
 
-expect(node, inputs=[X], outputs=[values_ref, indices_ref],
+expect(node, inputs=[X, K], outputs=[values_ref, indices_ref],
        name='test_top_k')
 ```
 
@@ -6757,175 +6952,10 @@ expect(node, inputs=[x, y], outputs=[z],
 <br/>
 
 ## &#x1F49A;Covered Experimental Operators
-### DynamicSlice
-There are 5 test cases, listed as following:
-<details>
-<summary>dynamic_slice</summary>
-
-```python
-node = onnx.helper.make_node(
-    'DynamicSlice',
-    inputs=['x', 'starts', 'ends', 'axes'],
-    outputs=['y'],
-)
-
-x = np.random.randn(20, 10, 5).astype(np.float32)
-y = x[0:3, 0:10]
-starts = np.array([0, 0], dtype=np.int64)
-ends = np.array([3, 10], dtype=np.int64)
-axes = np.array([0, 1], dtype=np.int64)
-
-expect(node, inputs=[x, starts, ends, axes], outputs=[y],
-       name='test_dynamic_slice')
-```
-
-</details>
-<details>
-<summary>dynamic_slice_default_axes</summary>
-
-```python
-node = onnx.helper.make_node(
-    'DynamicSlice',
-    inputs=['x', 'starts', 'ends'],
-    outputs=['y'],
-)
-
-x = np.random.randn(20, 10, 5).astype(np.float32)
-starts = np.array([0, 0, 3], dtype=np.int64)
-ends = np.array([20, 10, 4], dtype=np.int64)
-y = x[:, :, 3:4]
-
-expect(node, inputs=[x, starts, ends], outputs=[y],
-       name='test_dynamic_slice_default_axes')
-```
-
-</details>
-<details>
-<summary>dynamic_slice_end_out_of_bounds</summary>
-
-```python
-node = onnx.helper.make_node(
-    'DynamicSlice',
-    inputs=['x', 'starts', 'ends', 'axes'],
-    outputs=['y'],
-)
-
-x = np.random.randn(20, 10, 5).astype(np.float32)
-starts = np.array([1], dtype=np.int64)
-ends = np.array([1000], dtype=np.int64)
-axes = np.array([1], dtype=np.int64)
-y = x[:, 1:1000]
-
-expect(node, inputs=[x, starts, ends, axes], outputs=[y],
-       name='test_dynamic_slice_end_out_of_bounds')
-```
-
-</details>
-<details>
-<summary>dynamic_slice_neg</summary>
-
-```python
-node = onnx.helper.make_node(
-    'DynamicSlice',
-    inputs=['x', 'starts', 'ends', 'axes'],
-    outputs=['y'],
-)
-
-x = np.random.randn(20, 10, 5).astype(np.float32)
-starts = np.array([0], dtype=np.int64)
-ends = np.array([-1], dtype=np.int64)
-axes = np.array([1], dtype=np.int64)
-y = x[:, 0:-1]
-
-expect(node, inputs=[x, starts, ends, axes], outputs=[y],
-       name='test_dynamic_slice_neg')
-```
-
-</details>
-<details>
-<summary>dynamic_slice_start_out_of_bounds</summary>
-
-```python
-node = onnx.helper.make_node(
-    'DynamicSlice',
-    inputs=['x', 'starts', 'ends', 'axes'],
-    outputs=['y'],
-)
-
-x = np.random.randn(20, 10, 5).astype(np.float32)
-starts = np.array([1000], dtype=np.int64)
-ends = np.array([1000], dtype=np.int64)
-axes = np.array([1], dtype=np.int64)
-y = x[:, 1000:1000]
-
-expect(node, inputs=[x, starts, ends, axes], outputs=[y],
-       name='test_dynamic_slice_start_out_of_bounds')
-```
-
-</details>
-
-
-### ThresholdedRelu
-There are 2 test cases, listed as following:
-<details>
-<summary>default</summary>
-
-```python
-default_alpha = 1.0
-node = onnx.helper.make_node(
-    'ThresholdedRelu',
-    inputs=['x'],
-    outputs=['y']
-)
-x = np.random.randn(3, 4, 5).astype(np.float32)
-y = np.clip(x, default_alpha, np.inf)
-y[y == default_alpha] = 0
-
-expect(node, inputs=[x], outputs=[y],
-       name='test_thresholdedrelu_default')
-```
-
-</details>
-<details>
-<summary>thresholdedrelu</summary>
-
-```python
-alpha = 2.0
-node = onnx.helper.make_node(
-    'ThresholdedRelu',
-    inputs=['x'],
-    outputs=['y'],
-    alpha=alpha
-)
-
-x = np.array([-1.5, 0., 1.2, 2.0, 2.2]).astype(np.float32)
-y = np.clip(x, alpha, np.inf)  # expected output [0., 0., 0., 0., 2.2]
-y[y == alpha] = 0
-
-expect(node, inputs=[x], outputs=[y],
-       name='test_thresholdedrelu_example')
-
-x = np.random.randn(3, 4, 5).astype(np.float32)
-y = np.clip(x, alpha, np.inf)
-y[y == alpha] = 0
-
-expect(node, inputs=[x], outputs=[y],
-       name='test_thresholdedrelu')
-```
-
-</details>
-
-
 <br/>
 
 ## &#x1F494;No Cover Experimental Operators
 ### ATen (call for test cases)
-
-
-### Affine (call for test cases)
-
-
-### Crop (call for test cases)
 
 
 ### GRUUnit (call for test cases)
@@ -6934,16 +6964,7 @@ expect(node, inputs=[x], outputs=[y],
 ### GivenTensorFill (call for test cases)
 
 
-### ImageScaler (call for test cases)
-
-
-### ParametricSoftplus (call for test cases)
-
-
 ### Scale (call for test cases)
-
-
-### ScaledTanh (call for test cases)
 
 
 <br/>
@@ -6989,9 +7010,10 @@ bias: 1
 size: 1
 </details>
 <details>
-<summary>MaxPool: 3 out of 5 attributes covered</summary>
+<summary>MaxPool: 3 out of 6 attributes covered</summary>
 
 auto_pad: 0
+ceil_mode: 0
 kernel_shape: 1
 pads: 2
 storage_order: 0
@@ -7009,9 +7031,10 @@ densenet121 has 910 nodes. Of these, 910 are covered by node tests (100.0%)
 <summary>nodes</summary>
 
 <details>
-<summary>AveragePool: 3 out of 5 attributes covered</summary>
+<summary>AveragePool: 3 out of 6 attributes covered</summary>
 
 auto_pad: 0
+ceil_mode: 0
 count_include_pad: 0
 kernel_shape: 1
 pads: 1
@@ -7060,9 +7083,10 @@ bias: 1
 size: 1
 </details>
 <details>
-<summary>MaxPool: 3 out of 5 attributes covered</summary>
+<summary>MaxPool: 3 out of 6 attributes covered</summary>
 
 auto_pad: 0
+ceil_mode: 0
 kernel_shape: 1
 pads: 3
 storage_order: 0
@@ -7085,9 +7109,10 @@ inception_v1 has 144 nodes. Of these, 144 are covered by node tests (100.0%)
 <summary>nodes</summary>
 
 <details>
-<summary>AveragePool: 3 out of 5 attributes covered</summary>
+<summary>AveragePool: 3 out of 6 attributes covered</summary>
 
 auto_pad: 0
+ceil_mode: 0
 count_include_pad: 0
 kernel_shape: 2
 pads: 2
@@ -7136,9 +7161,10 @@ bias: 1
 size: 1
 </details>
 <details>
-<summary>MaxPool: 3 out of 5 attributes covered</summary>
+<summary>MaxPool: 3 out of 6 attributes covered</summary>
 
 auto_pad: 0
+ceil_mode: 0
 kernel_shape: 1
 pads: 3
 storage_order: 0
@@ -7161,9 +7187,10 @@ inception_v2 has 509 nodes. Of these, 509 are covered by node tests (100.0%)
 <summary>nodes</summary>
 
 <details>
-<summary>AveragePool: 3 out of 5 attributes covered</summary>
+<summary>AveragePool: 3 out of 6 attributes covered</summary>
 
 auto_pad: 0
+ceil_mode: 0
 count_include_pad: 0
 kernel_shape: 3
 pads: 3
@@ -7212,9 +7239,10 @@ bias: 1
 size: 1
 </details>
 <details>
-<summary>MaxPool: 3 out of 5 attributes covered</summary>
+<summary>MaxPool: 3 out of 6 attributes covered</summary>
 
 auto_pad: 0
+ceil_mode: 0
 kernel_shape: 1
 pads: 3
 storage_order: 0
@@ -7237,9 +7265,10 @@ resnet50 has 176 nodes. Of these, 176 are covered by node tests (100.0%)
 <summary>nodes</summary>
 
 <details>
-<summary>AveragePool: 3 out of 5 attributes covered</summary>
+<summary>AveragePool: 3 out of 6 attributes covered</summary>
 
 auto_pad: 0
+ceil_mode: 0
 count_include_pad: 0
 kernel_shape: 3
 pads: 3
@@ -7288,9 +7317,10 @@ bias: 1
 size: 1
 </details>
 <details>
-<summary>MaxPool: 3 out of 5 attributes covered</summary>
+<summary>MaxPool: 3 out of 6 attributes covered</summary>
 
 auto_pad: 0
+ceil_mode: 0
 kernel_shape: 1
 pads: 3
 storage_order: 0
@@ -7313,9 +7343,10 @@ shufflenet has 203 nodes. Of these, 203 are covered by node tests (100.0%)
 <summary>nodes</summary>
 
 <details>
-<summary>AveragePool: 3 out of 5 attributes covered</summary>
+<summary>AveragePool: 3 out of 6 attributes covered</summary>
 
 auto_pad: 0
+ceil_mode: 0
 count_include_pad: 0
 kernel_shape: 3
 pads: 3
@@ -7364,9 +7395,10 @@ bias: 1
 size: 1
 </details>
 <details>
-<summary>MaxPool: 3 out of 5 attributes covered</summary>
+<summary>MaxPool: 3 out of 6 attributes covered</summary>
 
 auto_pad: 0
+ceil_mode: 0
 kernel_shape: 1
 pads: 3
 storage_order: 0
@@ -7394,9 +7426,10 @@ squeezenet_old has 66 nodes. Of these, 66 are covered by node tests (100.0%)
 <summary>nodes</summary>
 
 <details>
-<summary>AveragePool: 3 out of 5 attributes covered</summary>
+<summary>AveragePool: 3 out of 6 attributes covered</summary>
 
 auto_pad: 0
+ceil_mode: 0
 count_include_pad: 0
 kernel_shape: 3
 pads: 3
@@ -7445,9 +7478,10 @@ bias: 1
 size: 1
 </details>
 <details>
-<summary>MaxPool: 3 out of 5 attributes covered</summary>
+<summary>MaxPool: 3 out of 6 attributes covered</summary>
 
 auto_pad: 0
+ceil_mode: 0
 kernel_shape: 1
 pads: 3
 storage_order: 0
@@ -7475,9 +7509,10 @@ vgg19 has 46 nodes. Of these, 46 are covered by node tests (100.0%)
 <summary>nodes</summary>
 
 <details>
-<summary>AveragePool: 3 out of 5 attributes covered</summary>
+<summary>AveragePool: 3 out of 6 attributes covered</summary>
 
 auto_pad: 0
+ceil_mode: 0
 count_include_pad: 0
 kernel_shape: 3
 pads: 3
@@ -7526,9 +7561,10 @@ bias: 1
 size: 1
 </details>
 <details>
-<summary>MaxPool: 3 out of 5 attributes covered</summary>
+<summary>MaxPool: 3 out of 6 attributes covered</summary>
 
 auto_pad: 0
+ceil_mode: 0
 kernel_shape: 2
 pads: 3
 storage_order: 0
@@ -7556,9 +7592,10 @@ zfnet512 has 22 nodes. Of these, 22 are covered by node tests (100.0%)
 <summary>nodes</summary>
 
 <details>
-<summary>AveragePool: 3 out of 5 attributes covered</summary>
+<summary>AveragePool: 3 out of 6 attributes covered</summary>
 
 auto_pad: 0
+ceil_mode: 0
 count_include_pad: 0
 kernel_shape: 3
 pads: 3
@@ -7607,9 +7644,10 @@ bias: 2
 size: 1
 </details>
 <details>
-<summary>MaxPool: 3 out of 5 attributes covered</summary>
+<summary>MaxPool: 3 out of 6 attributes covered</summary>
 
 auto_pad: 0
+ceil_mode: 0
 kernel_shape: 2
 pads: 3
 storage_order: 0
