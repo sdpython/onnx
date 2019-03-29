@@ -5,7 +5,7 @@
 * [Overall Test Coverage](#overall-test-coverage)
 # Node Test Coverage
 ## Summary
-Node tests have covered 113/120 (94.17%, 5 generators excluded) common operators.
+Node tests have covered 114/121 (94.21%, 5 generators excluded) common operators.
 
 Node tests have covered 0/4 (0.00%, 0 generators excluded) experimental operators.
 
@@ -3142,7 +3142,7 @@ expect(node, inputs=[data_0, data_1], outputs=[result],
 
 
 ### MaxPool
-There are 13 test cases, listed as following:
+There are 14 test cases, listed as following:
 <details>
 <summary>maxpool_1d_default</summary>
 
@@ -3222,6 +3222,36 @@ padded = x
 y = pool(padded, x_shape, kernel_shape, strides, out_shape, (0, 0), 'MAX')
 
 expect(node, inputs=[x], outputs=[y], name='test_maxpool_2d_default')
+```
+
+</details>
+<details>
+<summary>maxpool_2d_dilations</summary>
+
+```python
+"""
+input_shape: [1, 1, 4, 4]
+output_shape: [1, 1, 2, 2]
+"""
+node = onnx.helper.make_node(
+    'MaxPool',
+    inputs=['x'],
+    outputs=['y'],
+    kernel_shape=[2, 2],
+    strides=[1, 1],
+    dilations=[2, 2]
+)
+x = np.array([[[
+    [1, 2, 3, 4],
+    [5, 6, 7, 8],
+    [9, 10, 11, 12],
+    [13, 14, 15, 16],
+]]]).astype(np.float32)
+y = np.array([[[
+    [11, 12],
+    [15, 16]]]]).astype(np.float32)
+
+expect(node, inputs=[x], outputs=[y], name='test_maxpool_2d_dilations')
 ```
 
 </details>
@@ -3661,10 +3691,10 @@ input_data = np.array([[[[0.8439683], [0.5665144], [0.05836735]],
     [[0.69248444], [0.54119414], [0.07513223]]]], dtype=np.float32)
 
 # Calculate expected output data
-data_mean = np.mean(input_data, axis=(0, 1, 2, 3), keepdims=1)
+data_mean = np.mean(input_data, axis=(0, 2, 3), keepdims=1)
 data_mean_squared = np.power(data_mean, 2)
 data_squared = np.power(input_data, 2)
-data_squared_mean = np.mean(data_squared, axis=(0, 1, 2, 3), keepdims=1)
+data_squared_mean = np.mean(data_squared, axis=(0, 2, 3), keepdims=1)
 std = np.sqrt(data_squared_mean - data_mean_squared)
 expected_output = (input_data - data_mean) / (std + 1e-9)
 
@@ -5273,6 +5303,124 @@ for test_name, shape in test_cases.items():
 </details>
 
 
+### Resize
+There are 4 test cases, listed as following:
+<details>
+<summary>downsample_linear</summary>
+
+```python
+node = onnx.helper.make_node(
+    'Resize',
+    inputs=['X', 'scales'],
+    outputs=['Y'],
+    mode='linear',
+)
+
+data = np.array([[[
+    [1, 2, 3, 4],
+    [5, 6, 7, 8],
+]]], dtype=np.float32)
+
+scales = np.array([1.0, 1.0, 0.6, 0.6], dtype=np.float32)
+
+output = np.array([[[
+    [1, 2.66666651]
+]]], dtype=np.float32)
+
+expect(node, inputs=[data, scales], outputs=[output],
+       name='test_resize_downsample_linear')
+```
+
+</details>
+<details>
+<summary>downsample_nearest</summary>
+
+```python
+node = onnx.helper.make_node(
+    'Resize',
+    inputs=['X', 'scales'],
+    outputs=['Y'],
+    mode='nearest',
+)
+
+data = np.array([[[
+    [1, 2, 3, 4],
+    [5, 6, 7, 8],
+]]], dtype=np.float32)
+
+scales = np.array([1.0, 1.0, 0.6, 0.6], dtype=np.float32)
+
+output = np.array([[[
+    [1, 3]
+]]], dtype=np.float32)
+
+expect(node, inputs=[data, scales], outputs=[output],
+       name='test_resize_downsample_nearest')
+```
+
+</details>
+<details>
+<summary>upsample_linear</summary>
+
+```python
+node = onnx.helper.make_node(
+    'Resize',
+    inputs=['X', 'scales'],
+    outputs=['Y'],
+    mode='linear',
+)
+
+data = np.array([[[
+    [1, 2],
+    [3, 4],
+]]], dtype=np.float32)
+
+scales = np.array([1.0, 1.0, 2.0, 2.0], dtype=np.float32)
+
+output = np.array([[[
+    [1, 1.5, 2, 2],
+    [2, 2.5, 3, 3],
+    [3, 3.5, 4, 4],
+    [3, 3.5, 4, 4],
+]]], dtype=np.float32)
+
+expect(node, inputs=[data, scales], outputs=[output],
+       name='test_resize_upsample_linear')
+```
+
+</details>
+<details>
+<summary>upsample_nearest</summary>
+
+```python
+node = onnx.helper.make_node(
+    'Resize',
+    inputs=['X', 'scales'],
+    outputs=['Y'],
+    mode='nearest',
+)
+
+data = np.array([[[
+    [1, 2],
+    [3, 4],
+]]], dtype=np.float32)
+
+scales = np.array([1.0, 1.0, 2.0, 3.0], dtype=np.float32)
+
+output = np.array([[[
+    [1, 1, 1, 2, 2, 2],
+    [1, 1, 1, 2, 2, 2],
+    [3, 3, 3, 4, 4, 4],
+    [3, 3, 3, 4, 4, 4],
+]]], dtype=np.float32)
+
+expect(node, inputs=[data, scales], outputs=[output],
+       name='test_resize_upsample_nearest')
+```
+
+</details>
+
+
 ### Scan
 There are 2 test cases, listed as following:
 <details>
@@ -6797,7 +6945,7 @@ output = np.array([[[
 ]]], dtype=np.float32)
 
 expect(node, inputs=[data, scales], outputs=[output],
-       name='test_upsample_nearest')
+       name='test_upsample_nearest', opset_imports=[helper.make_opsetid("", 9)])
 ```
 
 </details>
@@ -7010,10 +7158,11 @@ bias: 1
 size: 1
 </details>
 <details>
-<summary>MaxPool: 3 out of 6 attributes covered</summary>
+<summary>MaxPool: 3 out of 7 attributes covered</summary>
 
 auto_pad: 0
 ceil_mode: 0
+dilations: 0
 kernel_shape: 1
 pads: 2
 storage_order: 0
@@ -7083,10 +7232,11 @@ bias: 1
 size: 1
 </details>
 <details>
-<summary>MaxPool: 3 out of 6 attributes covered</summary>
+<summary>MaxPool: 3 out of 7 attributes covered</summary>
 
 auto_pad: 0
 ceil_mode: 0
+dilations: 0
 kernel_shape: 1
 pads: 3
 storage_order: 0
@@ -7161,10 +7311,11 @@ bias: 1
 size: 1
 </details>
 <details>
-<summary>MaxPool: 3 out of 6 attributes covered</summary>
+<summary>MaxPool: 3 out of 7 attributes covered</summary>
 
 auto_pad: 0
 ceil_mode: 0
+dilations: 0
 kernel_shape: 1
 pads: 3
 storage_order: 0
@@ -7239,10 +7390,11 @@ bias: 1
 size: 1
 </details>
 <details>
-<summary>MaxPool: 3 out of 6 attributes covered</summary>
+<summary>MaxPool: 3 out of 7 attributes covered</summary>
 
 auto_pad: 0
 ceil_mode: 0
+dilations: 0
 kernel_shape: 1
 pads: 3
 storage_order: 0
@@ -7317,10 +7469,11 @@ bias: 1
 size: 1
 </details>
 <details>
-<summary>MaxPool: 3 out of 6 attributes covered</summary>
+<summary>MaxPool: 3 out of 7 attributes covered</summary>
 
 auto_pad: 0
 ceil_mode: 0
+dilations: 0
 kernel_shape: 1
 pads: 3
 storage_order: 0
@@ -7395,10 +7548,11 @@ bias: 1
 size: 1
 </details>
 <details>
-<summary>MaxPool: 3 out of 6 attributes covered</summary>
+<summary>MaxPool: 3 out of 7 attributes covered</summary>
 
 auto_pad: 0
 ceil_mode: 0
+dilations: 0
 kernel_shape: 1
 pads: 3
 storage_order: 0
@@ -7478,10 +7632,11 @@ bias: 1
 size: 1
 </details>
 <details>
-<summary>MaxPool: 3 out of 6 attributes covered</summary>
+<summary>MaxPool: 3 out of 7 attributes covered</summary>
 
 auto_pad: 0
 ceil_mode: 0
+dilations: 0
 kernel_shape: 1
 pads: 3
 storage_order: 0
@@ -7561,10 +7716,11 @@ bias: 1
 size: 1
 </details>
 <details>
-<summary>MaxPool: 3 out of 6 attributes covered</summary>
+<summary>MaxPool: 3 out of 7 attributes covered</summary>
 
 auto_pad: 0
 ceil_mode: 0
+dilations: 0
 kernel_shape: 2
 pads: 3
 storage_order: 0
@@ -7644,10 +7800,11 @@ bias: 2
 size: 1
 </details>
 <details>
-<summary>MaxPool: 3 out of 6 attributes covered</summary>
+<summary>MaxPool: 3 out of 7 attributes covered</summary>
 
 auto_pad: 0
 ceil_mode: 0
+dilations: 0
 kernel_shape: 2
 pads: 3
 storage_order: 0
