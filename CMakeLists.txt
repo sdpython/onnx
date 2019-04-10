@@ -401,7 +401,7 @@ if(BUILD_ONNX_PYTHON)
     target_link_libraries(onnx_cpp2py_export PRIVATE ${PYTHON_LIBRARIES})
     target_compile_options(onnx_cpp2py_export
                            PRIVATE /MP
-                                   /WX
+                                   /WX-
                                    /wd4800 # disable warning type' : forcing
                                            # value to bool 'true' or 'false'
                                            # (performance warning)
@@ -448,7 +448,7 @@ endif()
 if(MSVC)
   target_compile_options(onnx_proto
                          PRIVATE /MP
-                                 /WX
+                                 /WX-
                                  /wd4800 # disable warning type' : forcing value
                                          # to bool 'true' or 'false'
                                          # (performance warning)
@@ -461,7 +461,7 @@ if(MSVC)
                                  ${EXTRA_FLAGS})
   target_compile_options(onnx
                          PRIVATE /MP
-                                 /WX
+                                 /WX-
                                  /wd4800 # disable warning type' : forcing value
                                          # to bool 'true' or 'false'
                                          # (performance warning)
