@@ -17,17 +17,17 @@ environment:
     ONNX_NAMESPACE: ONNX_NAMESPACE_FOO_BAR_FOR_CI
 
   matrix:
-  - CONDA_PREFIX: C:\Miniconda35-x64
+  # - CONDA_PREFIX: C:\Miniconda35-x64
 
-  - CONDA_PREFIX: C:\Miniconda36-x64
+  # - CONDA_PREFIX: C:\Miniconda36-x64
 
-  - CONDA_PREFIX: C:\Miniconda36
+  # - CONDA_PREFIX: C:\Miniconda36
 
-  - CONDA_PREFIX: C:\Miniconda35
+  # - CONDA_PREFIX: C:\Miniconda35
 
   - CONDA_PREFIX: C:\Miniconda37-x64
 
-  - CONDA_PREFIX: C:\Miniconda37
+  # - CONDA_PREFIX: C:\Miniconda37
 
 install:
 - cmd: git submodule update --init --recursive
@@ -58,6 +58,7 @@ build_script:
 # Build and test onnx.
 - cmd: cd c:\projects\onnx
 - cmd: set ONNX_BUILD_TESTS=1
+- cmd: python setup.py --quiet bdist_wheel --universal
 - cmd: python setup.py --quiet bdist_wheel --universal --dist-dir .
 - cmd: dir /s /b /a-d "onnx_gtests.exe" >UT.txt & set /p _UT= < UT.txt & %_UT%
 - cmd: dir /b /a-d "*.whl" >WheelFile.txt & set /p _wheel= < WheelFile.txt
@@ -84,3 +85,7 @@ build_script:
 #   on_build_success: true
 #   on_build_failure: true
 #   on_build_status_changed: true
+
+artifacts:
+  - path: dist
+    name: onnx
