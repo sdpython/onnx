@@ -166,4 +166,4 @@ ONNX version|File format version|Operator set version ai.onnx|Operator set versi
 1.4.1|4|9|1
 1.5.0|5|10|1
 1.6.0|6|11|2
-1.6.34|6|11|2
+1.6.35|6|11|2
