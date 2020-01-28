@@ -332,6 +332,11 @@ ONNX_OPERATOR_SET_SCHEMA(
             axis += rank;
           }
 
+          if (numInputs == 1) {
+            propagateShapeFromInputToOutput(ctx, 0, 0);
+            return;
+          }
+
           bool all_lengths_known = true;
           int total_length = 0;
 
@@ -394,7 +399,7 @@ ONNX_OPERATOR_SET_SCHEMA(
             "where r = rank(input).",
             AttributeProto::INT,
             static_cast<int64_t>(0))
-        .Attr("split", "length of each output", AttributeProto::INTS, OPTIONAL)
+        .Attr("split", "length of each output. Values should be >= 0.", AttributeProto::INTS, OPTIONAL)
         .SetDoc(Split_ver11_doc)
         .TypeAndShapeInferenceFunction([](InferenceContext& ctx) {
           for (int i = 0; i < static_cast<int>(ctx.getNumOutputs()); ++i) {
@@ -403,37 +408,22 @@ ONNX_OPERATOR_SET_SCHEMA(
           if (!hasNInputShapes(ctx, 1)) {
             return;
           }
-          std::vector<int64_t> split;
-          if (!getRepeatedAttribute(ctx, "split", split)) {
-            if (!ctx.getInputType(0)->tensor_type().has_shape()) {
-              return;
-            }
-            const auto& shape = ctx.getInputType(0)->tensor_type().shape();
-            int rank = shape.dim_size();
-            int axis = static_cast<int>(getAttribute(ctx, "axis", 0));
-            if (axis < -rank || axis >= rank) {
-              fail_type_inference(
-                  "Invalid value of attribute 'axis'. Rank=",
-                  rank,
-                  " Value=",
-                  axis);
-            }
-            if (axis < 0) {
-              axis += rank;
-            }
-            const auto& splitDim = shape.dim(axis);
-            if (!splitDim.has_dim_value()) {
-              return;
-            }
-            int splitDimValue = static_cast<int>(splitDim.dim_value());
-            int chunkSize =
-                splitDimValue / static_cast<int>(ctx.getNumOutputs());
-            int leftOver = splitDimValue -
-                (chunkSize * static_cast<int>(ctx.getNumOutputs()));
-            for (int i = 0; i < static_cast<int>(ctx.getNumOutputs()); i++) {
-              split.push_back(i < leftOver ? chunkSize + 1 : chunkSize);
-            }
 
+          const auto& shape = ctx.getInputType(0)->tensor_type().shape();
+          int rank = shape.dim_size();
+          int axis = static_cast<int>(getAttribute(ctx, "axis", 0));
+          if (axis < -rank || axis >= rank) {
+            fail_type_inference(
+                "Invalid value of attribute 'axis'. Rank=",
+                rank,
+                " Value=",
+                axis);
+          }
+          if (axis < 0) {
+            axis += rank;
+          }
+          const auto& split_dim = shape.dim(axis);
+          if (!split_dim.has_dim_value()) {
             for (size_t i = 0; i < ctx.getNumOutputs(); i++) {
               *ctx.getOutputType(i)->mutable_tensor_type()->mutable_shape() =
                   shape;
@@ -441,8 +431,52 @@ ONNX_OPERATOR_SET_SCHEMA(
                   ->mutable_tensor_type()
                   ->mutable_shape()
                   ->mutable_dim(axis)
-                  ->set_dim_value(split[i]);
+                  ->Clear();
             }
+            return;
+          }
+          int split_dim_value = static_cast<int>(split_dim.dim_value());
+
+          std::vector<int64_t> split;
+          if (getRepeatedAttribute(ctx, "split", split)) {
+            if (split.size() != ctx.getNumOutputs()) {
+              fail_shape_inference(
+                  "Mismatch between number of splits (",
+                  split.size(),
+                  ") and outputs (",
+                  ctx.getNumOutputs(),
+                  ")");
+            }
+            int64_t total_dim = 0;
+            for (int64_t d : split) {
+              total_dim += d;
+            }
+            if (total_dim != split_dim_value) {
+              fail_shape_inference(
+                  "Mismatch between the sum of 'split' (",
+                  total_dim,
+                  ") and the split dimension of the input (",
+                  split_dim_value,
+                  ")");
+            }
+          } else {
+            int num_outputs = static_cast<int>(ctx.getNumOutputs());
+            if (split_dim_value % num_outputs != 0) {
+              fail_shape_inference("The input is not evenly splittable");
+            }
+            int chunk_size = split_dim_value / num_outputs;
+            for (int i = 0; i < static_cast<int>(ctx.getNumOutputs()); i++) {
+              split.push_back(chunk_size);
+            }
+          }
+          for (size_t i = 0; i < ctx.getNumOutputs(); i++) {
+            *ctx.getOutputType(i)->mutable_tensor_type()->mutable_shape() =
+                shape;
+            ctx.getOutputType(i)
+                ->mutable_tensor_type()
+                ->mutable_shape()
+                ->mutable_dim(axis)
+                ->set_dim_value(split[i]);
           }
         }));
 
@@ -452,11 +486,13 @@ https://docs.scipy.org/doc/numpy/reference/arrays.indexing.html
 Slices uses `starts`, `ends`, `axes` and `steps` inputs to specify the start and end
 dimension and step for each axis in the list of axes, it uses this information to
 slice the input `data` tensor. If a negative value is passed for any of the
-start or end indices, it represent number of elements before the end of that
+start or end indices, it represents number of elements before the end of that
 dimension. If the value passed to start or end is larger than the `n` (the
 number of elements in this dimension), it represents `n`. For slicing to the
-end of a dimension with unknown size, it is recommended to pass in `INT_MAX`.
-If a negative value is passed for step, it represents slicing backward.
+end of a dimension with unknown size, it is recommended to pass in `INT_MAX` 
+when sclicing forward and 'INT_MIN' when slicing backward.
+If a negative value is passed for step, it represents slicing backward. 
+However step value cannot be 0.
 If `axes` are omitted, they are set to `[0, ..., ndim-1]`.
 If `steps` are omitted, they are set to `[1, ..., 1]` of length `len(starts)`
 Example 1:
@@ -509,7 +545,9 @@ ONNX_OPERATOR_SET_SCHEMA(
         .Input(
             4,
             "steps",
-            "1-D tensor of slice step of corresponding axis in `axes`. Default to 1. ",
+            "1-D tensor of slice step of corresponding axis in `axes`. "
+            "Negative value means slicing backward. 'steps' cannot be 0. "
+            "Defaults to 1.",
             "Tind",
             OpSchema::Optional)
         .Output(0, "output", "Sliced data tensor.", "T")
@@ -1227,7 +1265,10 @@ ONNX_OPERATOR_SET_SCHEMA(
             "Constrain indices to integer types")
         .TypeAndShapeInferenceFunction([](InferenceContext& ctx) {
           propagateElemTypeFromInputToOutput(ctx, 0, 0);
-          propagateShapeFromInputToOutput(ctx, 1, 0);
+          // propagate indices' shape to output if it exists
+          if (hasInputShape(ctx, 1)) {
+            propagateShapeFromInputToOutput(ctx, 1, 0);
+          }
         }));
 
 static const char* Squeeze_ver11_doc = R"DOC(
@@ -1301,11 +1342,18 @@ ONNX_OPERATOR_SET_SCHEMA(
         }));
 
 static const char* Unsqueeze_ver11_doc = R"DOC(
-Insert single-dimensional entries to the shape of a tensor.
-Takes one required argument `axes`, a list of dimensions that will be inserted.
-Dimension indices in `axes` are as seen in the output tensor. For example:
-  Given a tensor such that tensor with shape [3, 4, 5], then
-  Unsqueeze(tensor, axes=[0, 4]) has shape [1, 3, 4, 5, 1]
+Insert single-dimensional entries to the shape of an input tensor (`data`).
+Takes one required argument `axes` - which contains a list of dimension indices and this operator will insert a dimension of value `1` into the corresponding index of the output tensor (`expanded`).
+
+For example:
+  Given an input tensor (`data`) of shape [3, 4, 5], then
+  Unsqueeze(data, axes=[0, 4]) outputs a tensor (`expanded`) containing same data as `data` but with shape [1, 3, 4, 5, 1].
+
+The attribute `axes` should not contain any duplicate entries. It is an error if it contains duplicates.
+The rank of the output tensor (`output_rank`) is the rank of the input tensor (`data`) plus the number of values in `axes`.
+Each value in `axes` should be within the (inclusive) range [-output_rank , output_rank - 1]. 
+The order of values in `axes` does not matter and can come in any order. 
+
 )DOC";
 
 ONNX_OPERATOR_SET_SCHEMA(
@@ -1315,7 +1363,7 @@ ONNX_OPERATOR_SET_SCHEMA(
         .Attr(
             "axes",
             "List of integers indicating the dimensions to be inserted. Negative value means counting dimensions "
-            "from the back. Accepted range is [-r, r-1] where r = rank(data).",
+            "from the back. Accepted range is [-r, r-1] where r = rank(expanded).",
             AttributeProto::INTS)
         .SetDoc(Unsqueeze_ver11_doc)
         .Input(0, "data", "Original tensor", "T")
@@ -1334,7 +1382,16 @@ ONNX_OPERATOR_SET_SCHEMA(
           if (!getRepeatedAttribute(ctx, "axes", axes)) {
             return;
           }
-          std::sort(axes.begin(), axes.end());
+
+          // validate 'axes' for duplicate entries
+          std::unordered_set<int64_t> unique_values;
+          for (const auto val : axes) {
+            if (unique_values.find(val) != unique_values.end()) {
+              fail_shape_inference(
+                  "'axes' attribute must not contain any duplicates");
+            }
+            unique_values.insert(val);
+          }
 
           if (!ctx.getInputType(0)->tensor_type().has_shape()) {
             return;
@@ -1343,10 +1400,21 @@ ONNX_OPERATOR_SET_SCHEMA(
           ctx.getOutputType(0)->mutable_tensor_type()->mutable_shape();
           const auto& input_shape = ctx.getInputType(0)->tensor_type().shape();
           const auto input_ndim = input_shape.dim_size();
+          const auto output_ndim = input_ndim + static_cast<int>(axes.size());
           for (size_t(i) = 0; i < axes.size(); ++i) {
-            if (axes[i] < 0)
-              axes[i] += input_ndim;
+            if (axes[i] < -output_ndim || axes[i] >= output_ndim) {
+              fail_shape_inference(
+                  "values in 'axes' are beyond the bounds of the computed output shape");
+            }
+            if (axes[i] < 0) {
+              axes[i] += output_ndim;
+            }
           }
+
+          // sort after correcting negative axes values (if any) in the previous
+          // step
+          std::sort(axes.begin(), axes.end());
+
           int j = 0;
           for (int i = 0; i < input_ndim; ++i) {
             while (static_cast<size_t>(j) < axes.size() &&
@@ -2085,7 +2153,7 @@ ONNX_OPERATOR_SET_SCHEMA(
     OpSchema()
         .SetDoc(NonZero_ver9_doc)
         .Input(0, "X", "input", "T")
-        .Output(0, "Y", "output (always 2D tensor)", "tensor(int64)")
+        .Output(0, "Y", "output", "tensor(int64)")
         .TypeConstraint(
             "T",
             OpSchema::all_tensor_types(),

@@ -3,7 +3,7 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-from onnx import checker, helper, ModelProto, TensorProto, GraphProto, NodeProto
+from onnx import checker, helper, ModelProto, TensorProto, GraphProto, NodeProto, shape_inference
 from typing import Sequence, Text, Any, Tuple, List, Callable
 from onnx import numpy_helper
 
@@ -87,7 +87,7 @@ class TestOptimizer(unittest.TestCase):
                         self._visit_all_nodes_recursive(gr, fn)
 
     def test_get_available_passes(self):  # type: () -> None
-        # FIXME does not garantees to be listing all
+        # FIXME does not guarantees to be listing all
         graph = helper.make_graph([], "dummy_graph", [], [])
         list_of_passes = onnx.optimizer.get_available_passes()
         assert isinstance(list_of_passes, (list)) and len(list_of_passes) > 0
@@ -439,10 +439,13 @@ class TestOptimizer(unittest.TestCase):
             nodes,
             "test",
             [helper.make_tensor_value_info("X", TensorProto.FLOAT, (2, 3, 4))],
-            [helper.make_tensor_value_info("A", TensorProto.FLOAT, (4, 3, 2)),
+            [helper.make_tensor_value_info("A", TensorProto.FLOAT, (2, 4, 3)),
              helper.make_tensor_value_info("Y4", TensorProto.FLOAT, (4, 3, 2))])
+        original_model = helper.make_model(graph)
+        shape_inference.infer_shapes(original_model)
         optimized_model = self._optimized(
             graph, ["fuse_consecutive_transposes"])
+        shape_inference.infer_shapes(optimized_model)
 
         # Transpose, Constant (trip count), Constant (cond), Loop
         assert len(list(optimized_model.graph.node)) == 4

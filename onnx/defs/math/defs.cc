@@ -2,6 +2,7 @@
 // Licensed under the MIT license.
 
 #include <functional>
+#include <algorithm>
 #include "onnx/defs/schema.h"
 #include "onnx/defs/tensor_proto_util.h"
 
@@ -41,11 +42,9 @@ std::function<void(OpSchema&)> SoftmaxFamilyDocGenerator(
   return [=](OpSchema& schema) {
     std::string doc = R"DOC(
 The operator computes the {name} ({description}) values for each layer in the batch
- of the given input. The input is a 2-D tensor (Tensor<float>) of size
-(batch_size x input_feature_dimensions). The output tensor has the same shape
-and contains the {name} values of the corresponding input.
+ of the given input.
 
-Input does not need to explicitly be a 2D vector; rather, it will be
+The input does not need to explicitly be a 2D vector; rather, it will be
 coerced into one. For an arbitrary n-dimensional tensor
 input \in [a_0, a_1, ..., a_{k-1}, a_k, ..., a_{n-1}] and k is
 the axis provided, then input will be coerced into a 2-dimensional tensor with
@@ -54,7 +53,8 @@ case where axis=1, this means the input tensor will be coerced into a 2D tensor
 of dimensions [a_0, a_1 * ... * a_{n-1}], where a_0 is often the batch size.
 In this situation, we must have a_0 = N and a_1 * ... * a_{n-1} = D.
 Each of these dimensions must be matched correctly, or else the operator
-will throw errors.
+will throw errors. The output tensor has the same shape
+and contains the {name} values of the corresponding input.
 )DOC";
     ReplaceAll(doc, "{name}", name);
     ReplaceAll(doc, "{description}", description);
@@ -84,27 +84,26 @@ will throw errors.
         {"tensor(float16)", "tensor(float)", "tensor(double)"},
         "Constrain input and output types to float tensors.");
     schema.TypeAndShapeInferenceFunction([](InferenceContext& ctx) {
+      // Type inference
       propagateElemTypeFromInputToOutput(ctx, 0, 0);
+      
+      // Shape inference starts
       if (!hasNInputShapes(ctx, 1)) {
         return;
       }
-      propagateShapeFromInputToOutput(ctx, 0, 0);
+
+      // Validate the value of 'axis'
       const TensorShapeProto& input_shape =
         ctx.getInputType(0)->tensor_type().shape();
       int r = input_shape.dim_size();
-      if (r != 2) {
-        fail_shape_inference("Input tensor must have rank == 2");
-      }
       int axis = static_cast<int>(getAttribute(ctx, "axis", 1));
-      if (axis){
-        if (axis < -r || axis >= r) {
+      if (axis < -r || axis >= r) {
           fail_shape_inference(
-            "'axis' must be in [-rank(indices), rank(indices)-1]");
-        }
-        if (axis < 0) {
-          axis += r;
-        }
+         "'axis' must be in [", -r, " , " , (r-1) , "]. Its actual value is: ", axis);
       }
+
+      // Shape inference
+      propagateShapeFromInputToOutput(ctx, 0, 0);
     });
   };
 }
@@ -727,7 +726,7 @@ ONNX_OPERATOR_SET_SCHEMA(
             "Constrain input and output types to float tensors.")
         .TypeAndShapeInferenceFunction(propagateShapeAndTypeFromFirstInput));
 
-static const char* Gemm_ver9_doc = R"DOC(General Matrix multiplication:
+static const char* Gemm_ver11_doc = R"DOC(General Matrix multiplication:
 https://en.wikipedia.org/wiki/Basic_Linear_Algebra_Subprograms#Level_3
 
 A' = transpose(A) if transA else A
@@ -742,11 +741,13 @@ computation if attribute transA is non-zero, same for B and transB.
 
 ONNX_OPERATOR_SET_SCHEMA(
     Gemm,
-    9,
+    11,
     OpSchema()
         .SetDoc(
-            Gemm_ver9_doc +
-            GenerateBroadcastingDocUni("tensor C", "tensor A * B"))
+            Gemm_ver11_doc +
+            GenerateBroadcastingDocUni("tensor C", "tensor A * B") +
+            "\n" +
+            GenerateOptionalArgumentsDoc())
         .Input(
             0,
             "A",
@@ -764,9 +765,11 @@ ONNX_OPERATOR_SET_SCHEMA(
         .Input(
             2,
             "C",
-            "Input tensor C. "
+            "Optional input tensor C. "
+            "If not specified, the computation is done as if C is a scalar 0. "
             "The shape of C should be unidirectional broadcastable to (M, N).",
-            "T")
+            "T",
+            OpSchema::Optional)
         .Output(0, "Y", "Output tensor of shape (M, N).", "T")
         .TypeConstraint(
             "T",
@@ -809,10 +812,12 @@ ONNX_OPERATOR_SET_SCHEMA(
                 transBAttr ? static_cast<int>(transBAttr->i()) != 0 : false;
             auto& first_input_shape = getInputShape(ctx, 0);
             auto& second_input_shape = getInputShape(ctx, 1);
-            if (first_input_shape.dim_size() != 2)
+            if (first_input_shape.dim_size() != 2) {
               fail_shape_inference("First input does not have rank 2");
-            if (second_input_shape.dim_size() != 2)
+            }
+            if (second_input_shape.dim_size() != 2) {
               fail_shape_inference("Second input does not have rank 2");
+            }
             updateOutputShape(
                 ctx,
                 0,
@@ -1659,6 +1664,146 @@ ONNX_OPERATOR_SET_SCHEMA(
               *dim = input_shape.dim(i);
             }
           }
+        }));
+
+void einsumRankInference(
+    ONNX_NAMESPACE::InferenceContext& ctx, std::string equation) {
+
+  const size_t numInputs = ctx.getNumInputs();
+  if (numInputs < 1 || !hasNInputShapes(ctx, static_cast<int>(numInputs))) {
+    return;
+  }
+
+  auto* output_shape = getOutputShape(ctx, 0);
+  std::string  left_equation;
+
+  equation.erase(std::remove(equation.begin(), equation.end(), ' '), equation.end()); // Remove space char
+  auto mid_index = equation.find("->");
+  if (mid_index != std::string::npos) {
+    // Separate right and left hand sides of the equation
+    left_equation = equation.substr(0, mid_index);
+  } else {
+    // No right hand side
+    left_equation = equation;
+  }
+
+  std::string term;
+  size_t num_operands = 0;
+  size_t num_ellipsis = 0;
+  size_t num_ellipsis_indices = 0;
+
+  // Parse the left-hand side
+  std::stringstream str(left_equation);
+  while(std::getline(str, term, ',')) {
+    auto ellipsis_index = term.find("...");
+    if (ellipsis_index != std::string::npos) {
+      if (numInputs <= num_operands) {
+        fail_shape_inference("Number of input tensors does not match the operands in the equation.");
+      }
+      // If there is an ellipsis, the number of dimensions it represents must be total dim - letter dimensions
+      size_t rank = ctx.getInputType(num_operands)->tensor_type().shape().dim_size();
+      if (num_ellipsis == 0) {
+        num_ellipsis_indices = rank - term.size() + 3;
+      } else { // ellipsis has been seen before. Check that if dimensions are compatible
+        if (num_ellipsis_indices != rank - term.size() + 3) {
+          fail_shape_inference("Ellipsis represents incompatible dimensions.");
+        }
+      }
+      num_ellipsis++;
+    }
+    num_operands++;
+  }
+
+  if (numInputs != num_operands) {
+    fail_shape_inference("Number of input tensors does not match the operands in the equation.");
+  }
+
+  const size_t number_of_letters = 26;
+  size_t num_letter_occurrences[number_of_letters] = {0};
+  // Parse the provided right-hand side
+  if (mid_index != std::string::npos) {
+    std::string right_equation = equation.substr(mid_index + 2);
+    auto right_ellipsis_index = right_equation.find("...");
+    if (right_ellipsis_index != std::string::npos) { // Right-hand side contains ellipsis
+      for (size_t i = 0; i < num_ellipsis; ++i) {
+        output_shape->add_dim();
+      }
+    }
+    for (char c: right_equation) { // Add a dimension per each character in right hand equation
+      if (c != '.') {
+        output_shape->add_dim();
+      }
+    }
+  } else { // Infer the dimension for right-hand side
+    // If there's an ellipsis, add it's corresponding dimensions
+    for (size_t i = 0; i < num_ellipsis_indices; i++) {
+      output_shape->add_dim();
+    }
+    for (size_t i = 0; i < left_equation.size(); i++) { // Count chars that appear exactly once on left hand side
+      if ((left_equation.at(i) != ',') && (left_equation.at(i) != '.')) {
+        num_letter_occurrences[left_equation.at(i) - 'a']++;
+      }
+    }
+    for (size_t index = 0; index < number_of_letters; index++) {
+      if (num_letter_occurrences[index] == 1) {
+        output_shape->add_dim();
+      }
+    }
+  }
+}
+
+static const char* Einsum_ver12_doc = R"DOC(
+An einsum of the form ```term1, term2 -> output-term``` produces an output tensor using the following equation
+
+```output[output-term] = reduce-sum( input1[term1] * input2[term] )```
+
+where the reduce-sum performs a summation over all the indices occurring in in the input terms (term1, term2)
+that do not occur in the output-term.
+
+The Einsum operator evaluates algebraic tensor operations on a sequence of tensors, using the Einstein summation
+convention. The equation string contains a comma-separated sequence of lower case letters. Each term corresponds to
+an operand tensor, and the characters within the terms correspond to operands dimensions.
+
+This sequence may be followed by "->" to separate the left and right hand side of the equation.
+If the equation contains "->" followed by the right-hand side, the explicit (not classical) form of the Einstein
+summation is performed, and the right-hand side indices indicate output tensor dimensions. In other cases,
+output indices are (implicitly) set to the alphabetically sorted sequence of indices appearing exactly once in the
+equation.
+
+When a dimension character is repeated in the left-hand side, it represents summation along the dimension.
+
+The equation may contain ellipsis ("...") to enable broadcasting. Ellipsis must indicate a fixed number of dimensions.
+The right-hand side may contain exactly one ellipsis. In implicit mode, the ellipsis dimensions are set to the
+beginning of the output. The equation string may contain space (U+0020) character.
+)DOC";
+
+ONNX_OPERATOR_SET_SCHEMA(
+    Einsum,
+    12,
+    OpSchema()
+        .SetDoc(Einsum_ver12_doc)
+        .Attr(
+            "equation",
+            "Einsum expression string.",
+            AttributeProto::STRING)
+        .Input(0,
+            "Inputs",
+            "Operands",
+            "T",
+            OpSchema::Variadic)
+        .Output(0, "Output", "Output tensor", "T")
+        .TypeConstraint(
+            "T",
+            OpSchema::all_numeric_types(),
+            "Constrain input and output types to all numerical tensor types.")
+        .TypeAndShapeInferenceFunction([](InferenceContext& ctx) {
+          // Type inference
+          propagateElemTypeFromInputToOutput(ctx, 0, 0);
+          std::string equation = getAttribute(ctx, "equation", "");
+          if (equation.compare("") == 0) {
+            return;
+          }
+	        einsumRankInference(ctx, equation);
         }));
 
 } // namespace ONNX_NAMESPACE
