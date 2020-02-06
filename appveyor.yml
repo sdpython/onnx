@@ -28,6 +28,7 @@ environment:
   # - CONDA_PREFIX: C:\Miniconda35
 
   - CONDA_PREFIX: C:\Miniconda37-x64
+  - CONDA_PREFIX: C:\Miniconda38-x64
 
   # - CONDA_PREFIX: C:\Miniconda37
 
