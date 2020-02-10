@@ -55,7 +55,7 @@ build_script:
 - cmd: set ONNX_BUILD_TESTS=1
 - cmd: set CMAKE_ARGS="-DONNX_USE_PROTOBUF_SHARED_LIBS=ON"
 # - cmd: python setup.py --quiet bdist_wheel --universal --dist-dir .
-- cmd: python setup.py --quiet bdist_wheel --universal
+- cmd: python setup.py --quiet bdist_wheel --universal --verbose
 - cmd: dir /s /b /a-d "onnx_gtests.exe" >UT.txt & set /p _UT= < UT.txt & %_UT%
 - cmd: dir /b /a-d "*.whl" >WheelFile.txt & set /p _wheel= < WheelFile.txt
 - cmd: pip install %_wheel%
