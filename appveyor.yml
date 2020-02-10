@@ -89,5 +89,5 @@ build_script:
 #   on_build_status_changed: true
 
 artifacts:
-  - path: *.whl
+  - path: '*.whl'
     name: onnx
