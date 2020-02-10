@@ -46,6 +46,10 @@ before_build:
   (
   set "PATH=%PATH%;%CONDA_PREFIX%\Library\bin"
   )
+  IF "%_prefix%"=="C:\Miniconda38"
+  (
+  set "PATH=%PATH%;%CONDA_PREFIX%\Library\bin"
+  )
 
 - cmd: pip install --quiet pytest nbval numpy
 
@@ -85,3 +89,4 @@ build_script:
 artifacts:
   - path: dist
     name: onnx
+    type: whl
