@@ -46,6 +46,8 @@ before_build:
   (
   set "PATH=%PATH%;%CONDA_PREFIX%\Library\bin"
   )
+
+- >
   IF "%_prefix%"=="C:\Miniconda38"
   (
   set "PATH=%PATH%;%CONDA_PREFIX%\Library\bin"
