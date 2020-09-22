@@ -49,6 +49,7 @@ build_script:
 # Build and test onnx.
 - cmd: cd c:\projects\onnx
 - cmd: set ONNX_BUILD_TESTS=1
+- cmd: set ONNX_ML=1
 
 #The latest libprotobuf Windows packages in anaconda was built with          
 #        -Dprotobuf_BUILD_SHARED_LIBS=ON 
