@@ -95,3 +95,6 @@ build_script:
 artifacts:
   - path: '*.whl'
     name: onnx
+  - path: .
+    name: logs
+    type: zip
