@@ -81,6 +81,7 @@ build_script:
 # Will figure out and fix it in separate PR.
 #- cmd: C:\Miniconda36\Scripts\backend-test-tools generate-data
 - cmd: git diff --exit-code
+- 7z a onnx.zip onnx
 
 # add after_test commands to collect logs and such
 # add artifacts: -path to collect build artifacts
@@ -94,7 +95,9 @@ build_script:
 
 artifacts:
   - path: '*.whl'
-    name: onnx
-  - path: .
-    name: logs
+    name: onnxwhl
+  - path: '*.zip'
+    name: onnxzip
+  - path: 'onnx'
+    name: onnxzip2
     type: zip
