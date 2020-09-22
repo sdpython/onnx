@@ -62,7 +62,6 @@ build_script:
 - cmd: python onnx/gen_proto.py -l --ml
 - cmd: rm -rf .setuptools-cmake-build
 - cmd: pip install --quiet -e .[mypy]
-- cmd: python setup.py typecheck
 
 - cmd: git diff --exit-code  -- . :(exclude)onnx/onnx-data.proto :(exclude)onnx/onnx-data.proto3
 - cmd: python setup.py --quiet bdist_wheel --dist-dir . --verbose --verbose --verbose
