@@ -42,7 +42,7 @@ before_build:
 - cmd: SET _prefix=%CONDA_PREFIX:~0,14%
 - cmd: SET _arch=%CONDA_PREFIX:~15,18%
 - cmd: SET
-- cmd: conda install -y libprotobuf=3.11.3 protobuf numpy
+- cmd: conda install -y libprotobuf=3.11.3 protobuf==3.11.3 numpy
 - set "PATH=%PATH%;%CONDA_PREFIX%\Library\bin"
 - cmd: pip install --quiet pytest nbval numpy
 
@@ -60,11 +60,11 @@ build_script:
 - cmd: python onnx/defs/gen_doc.py
 - cmd: python onnx/gen_proto.py -l
 - cmd: python onnx/gen_proto.py -l --ml
-- cmd: rm -rf .setuptools-cmake-build
+# - cmd: rm -rf .setuptools-cmake-build
 - cmd: python setup.py build_ext --inplace
 
 - cmd: git diff --exit-code  -- . :(exclude)onnx/onnx-data.proto :(exclude)onnx/onnx-data.proto3
-- cmd: pip install --quiet -e .[mypy]
+# - cmd: pip install --quiet -e .[mypy]
 - cmd: python setup.py --quiet bdist_wheel --dist-dir . --verbose --verbose --verbose
 - cmd: 7z a onnx.zip onnx
 
