@@ -52,8 +52,8 @@ build_script:
 - cmd: set ONNX_BUILD_TESTS=1
 - cmd: set ONNX_ML=1
 - cmd: set ONNX_VERIFY_PROTO_3=0
-- cmd: set USE_MSVC_STATIC_RUNTIME=0
-- cmd: set CMAKE_ARGS=-DONNX_USE_PROTOBUF_SHARED_LIBS=ON -DProtobuf_USE_STATIC_LIBS=OFF -DONNX_USE_LITE_PROTO=ON -DONNX_WERROR=ON
+- cmd: set USE_MSVC_STATIC_RUNTIME=1
+- cmd: set CMAKE_ARGS=-DONNX_USE_PROTOBUF_SHARED_LIBS=OFF -DProtobuf_USE_STATIC_LIBS=ON -DONNX_USE_LITE_PROTO=ON -DONNX_WERROR=ON
 
 - cmd: python setup.py --quiet install
 - cmd: pytest
@@ -61,9 +61,10 @@ build_script:
 - cmd: python onnx/gen_proto.py -l
 - cmd: python onnx/gen_proto.py -l --ml
 - cmd: rm -rf .setuptools-cmake-build
-- cmd: pip install --quiet -e .[mypy]
+- cmd: python setup.py build_ext --inplace
 
 - cmd: git diff --exit-code  -- . :(exclude)onnx/onnx-data.proto :(exclude)onnx/onnx-data.proto3
+- cmd: pip install --quiet -e .[mypy]
 - cmd: python setup.py --quiet bdist_wheel --dist-dir . --verbose --verbose --verbose
 - cmd: 7z a onnx.zip onnx
 
