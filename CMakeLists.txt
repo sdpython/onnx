@@ -46,13 +46,9 @@ if(NOT DEFINED ONNX_VERIFY_PROTO3)
 endif()
 
  if (ONNX_USE_PROTOBUF_SHARED_LIBS)
-  if(MSVC AND ONNX_USE_MSVC_STATIC_RUNTIME)
+  if(MSVC)
+    #TODO: if ONNX_USE_MSVC_STATIC_RUNTIME is ON, it may not work
     add_definitions(-DPROTOBUF_USE_DLLS)
-  else()
-    message(
-      FATAL_ERROR 
-        "Building ONNX with Protobuf as shared lib is only available for MSVC compilers and that too when USE_MSVC_STATIC_RUNTIME environment variable is set to 1. Please read the build instructions for more details."
-    )
   endif()
 endif()
 
@@ -167,7 +163,8 @@ function(RELATIVE_PROTOBUF_GENERATE_CPP NAME SRCS HDRS ROOT_DIR DEPEND)
     set(ABS_FILE ${ROOT_DIR}/${INFILE})
     get_filename_component(FILE_DIR ${ABS_FILE} DIRECTORY)
     get_filename_component(FILE_WE ${INFILE} NAME_WE)
-    if(ONNX_ML)
+    # "onnx-data" check is because we do not want to create/compile an "onnx-data-ml.proto" file
+    if(ONNX_ML AND NOT(FILE_WE STREQUAL "onnx-data"))
       if(ONNX_NAMESPACE STREQUAL "onnx")
         set(GENERATED_FILE_WE "${FILE_WE}-ml")
       else()
@@ -306,11 +303,20 @@ relative_protobuf_generate_cpp(gen_onnx_operators_proto
 list(APPEND ONNX_PROTO_SRCS ${__tmp_srcs})
 list(APPEND ONNX_PROTO_HDRS ${__tmp_hdrs})
 
+relative_protobuf_generate_cpp(gen_onnx_data_proto
+                               __tmp_srcs
+                               __tmp_hdrs
+                               ${ONNX_ROOT}
+                               gen_onnx_proto
+                               onnx/onnx-data.in.proto)
+list(APPEND ONNX_PROTO_SRCS ${__tmp_srcs})
+list(APPEND ONNX_PROTO_HDRS ${__tmp_hdrs})
+
 file(GLOB_RECURSE __tmp_srcs "${ONNX_ROOT}/onnx/*.h" "${ONNX_ROOT}/onnx/*.cc")
 file(GLOB_RECURSE onnx_gtests_src "${ONNX_ROOT}/onnx/test/cpp/*.h"
-	"${ONNX_ROOT}/onnx/test/cpp/*.cc"
-	"${ONNX_ROOT}/onnx/backend/test/cpp/*.cc"
-	"${ONNX_ROOT}/onnx/backend/test/cpp/*.h")
+    "${ONNX_ROOT}/onnx/test/cpp/*.cc"
+    "${ONNX_ROOT}/onnx/backend/test/cpp/*.cc"
+    "${ONNX_ROOT}/onnx/backend/test/cpp/*.h")
 list(REMOVE_ITEM __tmp_srcs "${ONNX_ROOT}/onnx/cpp2py_export.cc")
 list(REMOVE_ITEM __tmp_srcs ${onnx_gtests_src})
 list(APPEND ONNX_SRCS ${__tmp_srcs})
@@ -456,11 +462,17 @@ if(BUILD_ONNX_PYTHON)
                                            # unsigned type, result still
                                            # unsigned from include\google\protob
                                            # uf\wire_format_lite.h
+                                 /wd4244 # 'argument': conversion from 'google::
+                                         # protobuf::uint64' to 'int', possible
+                                         # loss of data
+                                 /wd4267 # Conversion from 'size_t' to 'int',
+                                         # possible loss of data
+                                 /wd4996 # The second parameter is ignored.
                                    ${EXTRA_FLAGS})
     if(ONNX_USE_PROTOBUF_SHARED_LIBS)
-      target_compile_options(onnx_cpp2py_export 
-                             PRIVATE /wd4251 # 'identifier' : class 'type1' needs to 
-                                             # have dll-interface to be used by 
+      target_compile_options(onnx_cpp2py_export
+                             PRIVATE /wd4251 # 'identifier' : class 'type1' needs to
+                                             # have dll-interface to be used by
                                              # clients of class 'type2'
                             )
     endif()
@@ -510,6 +522,11 @@ if(MSVC)
                                          # unsigned type, result still unsigned:
                                          # include\google\protobuf\wire_format_l
                                          # ite.h
+                                 /wd4244 #'argument': conversion from 'google::
+                                         #protobuf::uint64' to 'int', possible
+                                         # loss of data
+                                 /wd4267 # Conversion from 'size_t' to 'int',
+                                         # possible loss of data
                                  ${EXTRA_FLAGS})
   target_compile_options(onnx
                          PRIVATE /MP
@@ -521,15 +538,21 @@ if(MSVC)
                                          # exceeded, name was truncated
                                  /wd4146 # unary minus operator applied to
                                          # unsigned type, result still unsigned
+                                 /wd4244 # 'argument': conversion from 'google::
+                                         # protobuf::uint64' to 'int', possible
+                                         # loss of data
+                                 /wd4267 # Conversion from 'size_t' to 'int',
+                                         # possible loss of data
+                                 /wd4996 # The second parameter is ignored.
                                  ${EXTRA_FLAGS})
   if(ONNX_USE_PROTOBUF_SHARED_LIBS)
-      target_compile_options(onnx_proto 
-                             PRIVATE /wd4251 # 'identifier' : class 'type1' needs to 
-                                             # have dll-interface to be used by 
+      target_compile_options(onnx_proto
+                             PRIVATE /wd4251 # 'identifier' : class 'type1' needs to
+                                             # have dll-interface to be used by
                                              # clients of class 'type2'
                             )
-      target_compile_options(onnx 
-                             PRIVATE /wd4251 # 'identifier' : class 'type1' needs to 
+      target_compile_options(onnx
+                             PRIVATE /wd4251 # 'identifier' : class 'type1' needs to
                                              # have dll-interface to be used by
                                              # clients of class 'type2'
                             )
@@ -583,6 +606,9 @@ endif()
 if (NOT ANDROID AND NOT IOS)
   # ---[ ONNXIFI wrapper
   add_library(onnxifi_wrapper MODULE onnx/onnxifi_wrapper.c)
+  if(MSVC)
+    add_msvc_runtime_flag(onnxifi_wrapper)
+  endif()
   target_include_directories(onnxifi_wrapper PRIVATE
     $<BUILD_INTERFACE:${ONNX_ROOT}>
     $<INSTALL_INTERFACE:include>)
@@ -624,12 +650,14 @@ if(MSVC)
   add_msvc_runtime_flag(onnxifi_dummy)
 endif()
 
+include(GNUInstallDirs)
+
 install(DIRECTORY ${ONNX_ROOT}/onnx
-        DESTINATION include
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
         FILES_MATCHING
         PATTERN "*.h")
 install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/onnx
-        DESTINATION include
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
         FILES_MATCHING
         PATTERN "*.h")
 
@@ -644,13 +672,13 @@ configure_file(
 install(FILES
   ${PROJECT_BINARY_DIR}/ONNXConfigVersion.cmake
   ${PROJECT_BINARY_DIR}/ONNXConfig.cmake
-  DESTINATION share/cmake/ONNX
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ONNX
   COMPONENT dev)
-install(EXPORT ONNXTargets DESTINATION share/cmake/ONNX)
+install(EXPORT ONNXTargets DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/ONNX")
 install(TARGETS
   onnx onnx_proto
   onnxifi onnxifi_dummy onnxifi_loader
-  EXPORT ONNXTargets DESTINATION lib)
+  EXPORT ONNXTargets DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
 if(NOT ANDROID AND NOT IOS)
   install(TARGETS onnxifi_wrapper
