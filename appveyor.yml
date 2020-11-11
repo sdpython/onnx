@@ -6,7 +6,7 @@ version: 0.3.{build}
 
 image: Visual Studio 2017
 platform: x64
-configuration: Debug
+configuration: Release
 
 clone_folder: c:\projects\onnx
 clone_depth: 2
@@ -41,7 +41,6 @@ before_build:
 - cmd: SET PATH=%CONDA_PREFIX%;%CONDA_PREFIX%\Scripts;%CONDA_PREFIX%\Library\bin;%PATH%
 - cmd: SET _prefix=%CONDA_PREFIX:~0,14%
 - cmd: SET _arch=%CONDA_PREFIX:~15,18%
-- cmd: SET
 - cmd: conda install -y libprotobuf=3.11.3 protobuf==3.11.3 numpy
 - set "PATH=%PATH%;%CONDA_PREFIX%\Library\bin"
 - cmd: pip install --quiet pytest nbval numpy
@@ -52,8 +51,9 @@ build_script:
 - cmd: set ONNX_BUILD_TESTS=1
 - cmd: set ONNX_ML=1
 - cmd: set ONNX_VERIFY_PROTO_3=0
-- cmd: set USE_MSVC_STATIC_RUNTIME=1
+- cmd: set USE_MSVC_STATIC_RUNTIME=0
 - cmd: set CMAKE_ARGS=-DONNX_USE_PROTOBUF_SHARED_LIBS=OFF -DProtobuf_USE_STATIC_LIBS=ON -DONNX_USE_LITE_PROTO=ON -DONNX_WERROR=ON
+- cmd: SET
 
 - cmd: python setup.py --quiet install
 - cmd: pytest
