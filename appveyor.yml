@@ -41,8 +41,8 @@ before_build:
 - cmd: SET PATH=%CONDA_PREFIX%;%CONDA_PREFIX%\Scripts;%CONDA_PREFIX%\Library\bin;%PATH%
 - cmd: SET _prefix=%CONDA_PREFIX:~0,14%
 - cmd: SET _arch=%CONDA_PREFIX:~15,18%
-- cmd: conda install -y libprotobuf=3.14.0 protobuf==3.14.0 numpy
 - set "PATH=%PATH%;%CONDA_PREFIX%\Library\bin"
+- cmd: conda install -y libprotobuf=3.14.0 protobuf=3.14.0 numpy
 - cmd: pip install --quiet pytest nbval numpy
 
 build_script:
