@@ -4,7 +4,7 @@ version: 0.3.{build}
 
 # build all branches by default
 
-image: Visual Studio 2017
+image: Visual Studio 2019
 platform: x64
 configuration: Release
 
@@ -27,8 +27,8 @@ environment:
 
   # - CONDA_PREFIX: C:\Miniconda35
 
-  - CONDA_PREFIX: C:\Miniconda37-x64
-  - CONDA_PREFIX: C:\Miniconda38-x64
+  #- CONDA_PREFIX: C:\Miniconda37-x64
+  - CONDA_PREFIX: C:\Miniconda39-x64
 
   # - CONDA_PREFIX: C:\Miniconda37
 
@@ -41,7 +41,7 @@ before_build:
 - cmd: SET PATH=%CONDA_PREFIX%;%CONDA_PREFIX%\Scripts;%CONDA_PREFIX%\Library\bin;%PATH%
 - cmd: SET _prefix=%CONDA_PREFIX:~0,14%
 - cmd: SET _arch=%CONDA_PREFIX:~15,18%
-- cmd: conda install -y libprotobuf=3.11.3 protobuf==3.11.3 numpy
+- cmd: conda install -y libprotobuf=3.14.0 protobuf==3.14.0 numpy
 - set "PATH=%PATH%;%CONDA_PREFIX%\Library\bin"
 - cmd: pip install --quiet pytest nbval numpy
 
