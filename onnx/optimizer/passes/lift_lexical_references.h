@@ -1,6 +1,11 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 #pragma once
 
 #include <set>
+#include "onnx/common/common.h"
 #include "onnx/optimizer/pass.h"
 
 namespace ONNX_NAMESPACE {
@@ -78,10 +83,7 @@ namespace optimization {
 //    return unresolved_references
 struct LiftLexicalReferences : public FullGraphBasedPass {
   explicit LiftLexicalReferences()
-      : FullGraphBasedPass(
-            PassType::Separate,
-            PassEfficiency::Complete,
-            PassOptimizationType::Memory) {}
+      : FullGraphBasedPass(PassType::Separate, PassEfficiency::Complete, PassOptimizationType::Memory) {}
 
   std::string getPassName() const override {
     return "lift_lexical_references";
@@ -150,14 +152,12 @@ struct LiftLexicalReferences : public FullGraphBasedPass {
 
     for (auto* n : g->nodes()) {
       // Skip optional input/captured value node.
-      if (n->kind() == ONNX_NAMESPACE::kUndefined ||
-          n->kind() == ONNX_NAMESPACE::kCaptured) {
+      if (n->kind() == ONNX_NAMESPACE::kUndefined || n->kind() == ONNX_NAMESPACE::kCaptured) {
         continue;
       }
       for (auto* inp : n->inputs()) {
         // Empty string is 0-input variadic argument. Skip that one.
-        if (!inp->uniqueName().empty() &&
-            !environment_stack->findInThisFrame(inp->uniqueName())) {
+        if (!inp->uniqueName().empty() && !environment_stack->findInThisFrame(inp->uniqueName())) {
           unresolved_references.insert(inp->uniqueName());
         }
       }
@@ -221,7 +221,7 @@ struct LiftLexicalReferences : public FullGraphBasedPass {
       for (auto& ref : unresolved) {
         errmsg += ref + ",";
       }
-      throw std::runtime_error(errmsg);
+      ONNX_THROW(errmsg);
     }
     return std::shared_ptr<PostPassAnalysis>(new PostPassAnalysis());
   }

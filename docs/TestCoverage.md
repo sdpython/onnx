@@ -1,3 +1,4 @@
+<!--- SPDX-License-Identifier: Apache-2.0 -->
 # Test Coverage Report (ONNX Core Operators)
 ## Outlines
 * [Node Test Coverage](#node-test-coverage)
@@ -2019,7 +2020,7 @@ expect(node, inputs=[x], outputs=[y],
 
 
 ### Conv
-There are 2 test cases, listed as following:
+There are 3 test cases, listed as following:
 <details>
 <summary>conv</summary>
 
@@ -2065,6 +2066,37 @@ y_without_padding = np.array([[[[54., 63., 72.],  # (1, 1, 3, 3) output tensor
                                 [144., 153., 162.]]]]).astype(np.float32)
 expect(node_without_padding, inputs=[x, W], outputs=[y_without_padding],
        name='test_basic_conv_without_padding')
+```
+
+</details>
+<details>
+<summary>conv_with_autopad_same</summary>
+
+```python
+
+x = np.array([[[[0., 1., 2., 3., 4.],  # (1, 1, 5, 5) input tensor
+                [5., 6., 7., 8., 9.],
+                [10., 11., 12., 13., 14.],
+                [15., 16., 17., 18., 19.],
+                [20., 21., 22., 23., 24.]]]]).astype(np.float32)
+W = np.array([[[[1., 1., 1.],  # (1, 1, 3, 3) tensor for convolution weights
+                [1., 1., 1.],
+                [1., 1., 1.]]]]).astype(np.float32)
+
+# Convolution with auto_pad='SAME_LOWER' and strides=2
+node = onnx.helper.make_node(
+    'Conv',
+    inputs=['x', 'W'],
+    outputs=['y'],
+    auto_pad='SAME_LOWER',
+    kernel_shape=[3, 3],
+    strides=[2, 2],
+)
+y = np.array([[[[12., 27., 24.],
+             [63., 108., 81.],
+             [72., 117., 84.]]]]).astype(np.float32)
+expect(node, inputs=[x, W], outputs=[y],
+       name='test_conv_with_autopad_same')
 ```
 
 </details>
@@ -2172,7 +2204,7 @@ expect(convinteger_node_with_padding, inputs=[x, w, x_zero_point], outputs=[y_wi
 
 
 ### ConvTranspose
-There are 6 test cases, listed as following:
+There are 7 test cases, listed as following:
 <details>
 <summary>convtranspose</summary>
 
@@ -2393,6 +2425,41 @@ node = onnx.helper.make_node(
 )
 expect(node, inputs=[x, W], outputs=[y],
        name='test_convtranspose_kernel_shape')
+```
+
+</details>
+<details>
+<summary>convtranspose_autopad_same</summary>
+
+```python
+x = np.array([[[[0., 1., 2.],  # (1, 1, 3, 3)
+                [3., 4., 5.],
+                [6., 7., 8.]]]]).astype(np.float32)
+
+W = np.array([[[[1., 1., 1.],  # (1, 2, 3, 3)
+                [1., 1., 1.],
+                [1., 1., 1.]],
+               [[1., 1., 1.],
+                [1., 1., 1.],
+                [1., 1., 1.]]]]).astype(np.float32)
+
+node = onnx.helper.make_node("ConvTranspose", ["X", "W"], ["Y"], auto_pad="SAME_LOWER", strides=[2, 2])
+
+y = np.array([[[[0., 0., 1., 1., 3., 2.],
+                [0., 0., 1., 1., 3., 2.],
+                [3., 3., 8., 5., 12., 7.],
+                [3., 3., 7., 4., 9., 5.],
+                [9., 9., 20., 11., 24., 13.],
+                [6., 6., 13., 7., 15., 8.]],
+
+               [[0., 0., 1., 1., 3., 2.],
+                [0., 0., 1., 1., 3., 2.],
+                [3., 3., 8., 5., 12., 7.],
+                [3., 3., 7., 4., 9., 5.],
+                [9., 9., 20., 11., 24., 13.],
+                [6., 6., 13., 7., 15., 8.]]]]).astype(np.float32)
+
+expect(node, inputs=[x, W], outputs=[y], name='test_convtranspose_autopad_same')
 ```
 
 </details>
@@ -3594,7 +3661,36 @@ expect(node, inputs=[x], outputs=[y],
 
 
 ### GRU
-There are 3 test cases, listed as following:
+There are 4 test cases, listed as following:
+<details>
+<summary>batchwise</summary>
+
+```python
+input = np.array([[[1., 2.]], [[3., 4.]], [[5., 6.]]]).astype(np.float32)
+
+input_size = 2
+hidden_size = 6
+number_of_gates = 3
+weight_scale = 0.2
+layout = 1
+
+node = onnx.helper.make_node(
+    'GRU',
+    inputs=['X', 'W', 'R'],
+    outputs=['Y', 'Y_h'],
+    hidden_size=hidden_size,
+    layout=layout
+)
+
+W = weight_scale * np.ones((1, number_of_gates * hidden_size, input_size)).astype(np.float32)
+R = weight_scale * np.ones((1, number_of_gates * hidden_size, hidden_size)).astype(np.float32)
+
+gru = GRU_Helper(X=input, W=W, R=R, layout=layout)
+Y, Y_h = gru.step()
+expect(node, inputs=[input, W, R], outputs=[Y.astype(np.float32), Y_h.astype(np.float32)], name='test_gru_batchwise')
+```
+
+</details>
 <details>
 <summary>defaults</summary>
 
@@ -3609,7 +3705,7 @@ number_of_gates = 3
 node = onnx.helper.make_node(
     'GRU',
     inputs=['X', 'W', 'R'],
-    outputs=['', 'Y'],
+    outputs=['', 'Y_h'],
     hidden_size=hidden_size
 )
 
@@ -3637,7 +3733,7 @@ number_of_gates = 3
 node = onnx.helper.make_node(
     'GRU',
     inputs=['X', 'W', 'R', 'B'],
-    outputs=['', 'Y'],
+    outputs=['', 'Y_h'],
     hidden_size=hidden_size
 )
 
@@ -3669,7 +3765,7 @@ number_of_gates = 3
 node = onnx.helper.make_node(
     'GRU',
     inputs=['X', 'W', 'R', 'B'],
-    outputs=['', 'Y'],
+    outputs=['', 'Y_h'],
     hidden_size=hidden_size
 )
 
@@ -4528,7 +4624,7 @@ expect(node, inputs=[x], outputs=[y],
 
 
 ### Identity
-There are 1 test cases, listed as following:
+There are 2 test cases, listed as following:
 <details>
 <summary>identity</summary>
 
@@ -4546,6 +4642,31 @@ data = np.array([[[
 
 expect(node, inputs=[data], outputs=[data],
        name='test_identity')
+```
+
+</details>
+<details>
+<summary>sequence</summary>
+
+```python
+node = onnx.helper.make_node(
+    'Identity',
+    inputs=['x'],
+    outputs=['y'],
+)
+
+data = [
+    np.array([[[
+        [1, 2],
+        [3, 4],
+    ]]], dtype=np.float32),
+    np.array([[[
+        [2, 3],
+        [1, 5],
+    ]]], dtype=np.float32)]
+
+expect(node, inputs=[data], outputs=[data], name='test_identity_sequence',
+    opset_imports=[onnx.helper.make_opsetid("", 13)])
 ```
 
 </details>
@@ -4869,7 +4990,36 @@ expect(node, inputs=[x], outputs=[y],
 
 
 ### LSTM
-There are 3 test cases, listed as following:
+There are 4 test cases, listed as following:
+<details>
+<summary>batchwise</summary>
+
+```python
+input = np.array([[[1., 2.]], [[3., 4.]], [[5., 6.]]]).astype(np.float32)
+
+input_size = 2
+hidden_size = 7
+weight_scale = 0.3
+number_of_gates = 4
+layout = 1
+
+node = onnx.helper.make_node(
+    'LSTM',
+    inputs=['X', 'W', 'R'],
+    outputs=['Y', 'Y_h'],
+    hidden_size=hidden_size,
+    layout=layout
+)
+
+W = weight_scale * np.ones((1, number_of_gates * hidden_size, input_size)).astype(np.float32)
+R = weight_scale * np.ones((1, number_of_gates * hidden_size, hidden_size)).astype(np.float32)
+
+lstm = LSTM_Helper(X=input, W=W, R=R, layout=layout)
+Y, Y_h = lstm.step()
+expect(node, inputs=[input, W, R], outputs=[Y.astype(np.float32), Y_h.astype(np.float32)], name='test_lstm_batchwise')
+```
+
+</details>
 <details>
 <summary>defaults</summary>
 
@@ -4884,7 +5034,7 @@ number_of_gates = 4
 node = onnx.helper.make_node(
     'LSTM',
     inputs=['X', 'W', 'R'],
-    outputs=['', 'Y'],
+    outputs=['', 'Y_h'],
     hidden_size=hidden_size
 )
 
@@ -4912,7 +5062,7 @@ number_of_gates = 4
 node = onnx.helper.make_node(
     'LSTM',
     inputs=['X', 'W', 'R', 'B'],
-    outputs=['', 'Y'],
+    outputs=['', 'Y_h'],
     hidden_size=hidden_size
 )
 
@@ -4945,7 +5095,7 @@ number_of_peepholes = 3
 node = onnx.helper.make_node(
     'LSTM',
     inputs=['X', 'W', 'R', 'B', 'sequence_lens', 'initial_h', 'initial_c', 'P'],
-    outputs=['', 'Y'],
+    outputs=['', 'Y_h'],
     hidden_size=hidden_size
 )
 
@@ -8022,7 +8172,35 @@ expect(node, inputs=[x, y_scale, y_zero_point], outputs=[y],
 
 
 ### RNN
-There are 3 test cases, listed as following:
+There are 4 test cases, listed as following:
+<details>
+<summary>batchwise</summary>
+
+```python
+input = np.array([[[1., 2.]], [[3., 4.]], [[5., 6.]]]).astype(np.float32)
+
+input_size = 2
+hidden_size = 4
+weight_scale = 0.5
+layout = 1
+
+node = onnx.helper.make_node(
+    'RNN',
+    inputs=['X', 'W', 'R'],
+    outputs=['Y', 'Y_h'],
+    hidden_size=hidden_size,
+    layout=layout
+)
+
+W = weight_scale * np.ones((1, hidden_size, input_size)).astype(np.float32)
+R = weight_scale * np.ones((1, hidden_size, hidden_size)).astype(np.float32)
+
+rnn = RNN_Helper(X=input, W=W, R=R, layout=layout)
+Y, Y_h = rnn.step()
+expect(node, inputs=[input, W, R], outputs=[Y.astype(np.float32), Y_h.astype(np.float32)], name='test_simple_rnn_batchwise')
+```
+
+</details>
 <details>
 <summary>defaults</summary>
 
@@ -8036,7 +8214,7 @@ weight_scale = 0.1
 node = onnx.helper.make_node(
     'RNN',
     inputs=['X', 'W', 'R'],
-    outputs=['', 'Y'],
+    outputs=['', 'Y_h'],
     hidden_size=hidden_size
 )
 
@@ -8063,7 +8241,7 @@ weight_scale = 0.1
 node = onnx.helper.make_node(
     'RNN',
     inputs=['X', 'W', 'R', 'B'],
-    outputs=['', 'Y'],
+    outputs=['', 'Y_h'],
     hidden_size=hidden_size
 )
 
@@ -8095,7 +8273,7 @@ hidden_size = 5
 node = onnx.helper.make_node(
     'RNN',
     inputs=['X', 'W', 'R', 'B'],
-    outputs=['', 'Y'],
+    outputs=['', 'Y_h'],
     hidden_size=hidden_size
 )
 
@@ -9539,7 +9717,33 @@ expect(node, inputs=[x], outputs=[y],
 
 
 ### Reshape
-There are 1 test cases, listed as following:
+There are 2 test cases, listed as following:
+<details>
+<summary>allowzero</summary>
+
+```python
+original_shape = [0, 3, 4]
+test_cases = {
+    'allowzero_reordered': np.array([3, 4, 0], dtype=np.int64),
+}
+data = np.random.random_sample(original_shape).astype(np.float32)
+
+for test_name, shape in test_cases.items():
+    node = onnx.helper.make_node(
+        'Reshape',
+        inputs=['data', 'shape'],
+        outputs=['reshaped'],
+        allowzero=1,  # if allowzero=1, final shape = (3, 4, 0)
+                      # if allowzero=0, final shape = (3, 4, 4)
+    )
+
+    reshaped = reshape_reference_implementation(data, shape, allowzero=1)
+
+    expect(node, inputs=[data, shape], outputs=[reshaped],
+           name='test_reshape_' + test_name)
+```
+
+</details>
 <details>
 <summary>reshape</summary>
 
